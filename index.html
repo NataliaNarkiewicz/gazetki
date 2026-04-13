@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Produkty z gazetki</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    input {
+      padding: 8px;
+      margin-bottom: 15px;
+      width: 300px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>Produkty z gazetki</h1>
+
+<input type="text" placeholder="Szukaj..." oninput="search(this.value)">
+
+<div id="app">Ładowanie...</div>
+
+<script>
+const SUPABASE_URL = "https://xtucjfzxwfxnlowjwxgk.supabase.co";
+const SUPABASE_KEY = "sb_publishable_dJ-PnfD9Il9j4UrXSD2x5w_NjtPPc9J";
+
+let produkty = [];
+
+async function loadData() {
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/produkty?select=*", {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: "Bearer " + SUPABASE_KEY
+      }
+    });
+
+    produkty = await res.json();
+    render(produkty);
+
+  } catch (e) {
+    document.getElementById("app").innerHTML = "Błąd pobierania danych";
+    console.error(e);
+  }
+}
+
+function render(data) {
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+
+  data.forEach(p => {
+    app.innerHTML += `
+      <div class="card">
+        <b>${p.nazwa}</b><br>
+        Cena: ${p.cena} zł<br>
+        Sklep: ${p.sklep}<br>
+        Promocja: ${p.promocja}<br>
+        ${p.opis || ""}
+      </div>
+    `;
+  });
+}
+
+function search(text) {
+  const filtered = produkty.filter(p =>
+    p.nazwa.toLowerCase().includes(text.toLowerCase())
+  );
+  render(filtered);
+}
+
+loadData();
+</script>
+
+</body>
+</html>
