@@ -1,103 +1,167 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8">
-  <title>Produkty z gazetki</title>
+<meta charset="UTF-8">
+<title>Gazetka - Produkty</title>
 
-  <style>
-    body {
-      font-family: Arial;
-      padding: 20px;
-      background: #f5f5f5;
-    }
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: white;
+  }
 
-    h1 {
-      margin-bottom: 20px;
-    }
+  header {
+    padding: 20px;
+    background: #111827;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
 
-    input {
-      padding: 10px;
-      width: 300px;
-      margin-bottom: 20px;
-    }
+  h1 {
+    margin: 0;
+    font-size: 20px;
+  }
 
-    .card {
-      background: white;
-      padding: 12px;
-      margin-bottom: 10px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
 
-    .price {
-      font-weight: bold;
-    }
-  </style>
+  input, button {
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    outline: none;
+  }
+
+  input {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  button {
+    cursor: pointer;
+    background: #2563eb;
+    color: white;
+  }
+
+  button:hover {
+    background: #1d4ed8;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 15px;
+    padding: 20px;
+  }
+
+  .card {
+    background: #1f2937;
+    padding: 15px;
+    border-radius: 12px;
+    transition: 0.2s;
+  }
+
+  .card:hover {
+    transform: scale(1.03);
+  }
+
+  .price {
+    font-size: 18px;
+    font-weight: bold;
+    color: #22c55e;
+  }
+
+  .shop {
+    font-size: 12px;
+    opacity: 0.7;
+  }
+
+</style>
 </head>
 
 <body>
 
-<h1>Produkty z gazetki</h1>
+<header>
+  <h1>🛒 Gazetka Promocyjna</h1>
 
-<input type="text" placeholder="Szukaj..." oninput="search(this.value)">
+  <div class="controls">
+    <input type="text" placeholder="Szukaj produktu..." oninput="search(this.value)">
 
-<div id="app">Ładowanie...</div>
+    <button onclick="sortLowToHigh()">⬆ Cena rosnąco</button>
+    <button onclick="sortHighToLow()">⬇ Cena malejąco</button>
+    <button onclick="reset()">Reset</button>
+  </div>
+</header>
+
+<div id="app" class="grid">Ładowanie...</div>
 
 <script>
 const SUPABASE_URL = "https://xtucjfzxwfxnlowjwxgk.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0dWNqZnp4d2Z4bmxvd2p3eGdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDg0NzIsImV4cCI6MjA5MTM4NDQ3Mn0.CpIjKKhbXrNAnEefZYU-4T1jUWI7whpygeiXZggNvQs";
 
 let produkty = [];
+let filtered = [];
 
 async function loadData() {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/produkty?select=*`, {
-      method: "GET",
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: "Bearer " + SUPABASE_KEY
-      }
-    });
-
-    if (!res.ok) {
-      throw new Error("HTTP error: " + res.status);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/produkty?select=*`, {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: "Bearer " + SUPABASE_KEY
     }
+  });
 
-    produkty = await res.json();
-    render(produkty);
-
-  } catch (err) {
-    document.getElementById("app").innerHTML = "❌ Błąd pobierania danych";
-    console.error(err);
-  }
+  produkty = await res.json();
+  filtered = produkty;
+  render(filtered);
 }
 
 function render(data) {
   const app = document.getElementById("app");
   app.innerHTML = "";
 
-  if (data.length === 0) {
-    app.innerHTML = "Brak produktów";
-    return;
-  }
-
   data.forEach(p => {
     app.innerHTML += `
       <div class="card">
-        <div><b>${p.nazwa}</b></div>
+        <div class="shop">${p.sklep || ""}</div>
+        <h3>${p.nazwa}</h3>
         <div class="price">${p.cena} zł</div>
-        <div>Sklep: ${p.sklep}</div>
-        <div>Promocja: ${p.promocja || "-"}</div>
-        <div>${p.opis || ""}</div>
+        <div>${p.promocja || ""}</div>
+        <small>${p.opis || ""}</small>
       </div>
     `;
   });
 }
 
+// 🔍 SZUKANIE
 function search(text) {
-  const filtered = produkty.filter(p =>
+  filtered = produkty.filter(p =>
     p.nazwa.toLowerCase().includes(text.toLowerCase())
   );
+  render(filtered);
+}
+
+// ⬆ SORT ROSNĄCO
+function sortLowToHigh() {
+  filtered.sort((a, b) => a.cena - b.cena);
+  render(filtered);
+}
+
+// ⬇ SORT MALEJĄCO
+function sortHighToLow() {
+  filtered.sort((a, b) => b.cena - a.cena);
+  render(filtered);
+}
+
+// RESET
+function reset() {
+  filtered = produkty;
   render(filtered);
 }
 
