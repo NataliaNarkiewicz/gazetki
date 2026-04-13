@@ -78,19 +78,28 @@ button {
 
 <script>
 const SUPABASE_URL = "https://xtucjfzxwfxnlowjwxgk.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0dWNqZnp4d2Z4bmxvd2p3eGdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDg0NzIsImV4cCI6MjA5MTM4NDQ3Mn0.CpIjKKhbXrNAnEefZYU-4T1jUWI7whpygeiXZggNvQs";
+const SUPABASE_KEY = "TWÓJ_SUPABASE_KEY";
 
 let produkty = [];
 let userLat = null;
 let userLng = null;
 
-// 📍 GPS
-navigator.geolocation.getCurrentPosition(pos => {
-  userLat = pos.coords.latitude;
-  userLng = pos.coords.longitude;
 
-  loadShops(); // automatycznie po GPS
-});
+// ================= GPS (POPRAWIONE) =================
+
+navigator.geolocation.getCurrentPosition(
+  pos => {
+    userLat = pos.coords.latitude;
+    userLng = pos.coords.longitude;
+
+    loadProducts();
+    loadShops();
+  },
+  err => {
+    alert("Brak lokalizacji — włącz GPS");
+    loadProducts();
+  }
+);
 
 
 // ================= SUPABASE =================
@@ -123,7 +132,9 @@ function renderProducts(data) {
   });
 }
 
-// 🔍 SEARCH
+
+// ================= SEARCH =================
+
 function search(text) {
   renderProducts(
     produkty.filter(p =>
@@ -132,7 +143,9 @@ function search(text) {
   );
 }
 
-// 💰 SORT
+
+// ================= SORT =================
+
 function sortPrice() {
   produkty.sort((a,b) => a.cena - b.cena);
   renderProducts(produkty);
@@ -143,17 +156,18 @@ function sortPrice() {
 
 async function loadShops() {
   if (!userLat) {
-    alert("Brak lokalizacji");
+    alert("Brak GPS");
     return;
   }
 
   const query = `
   [out:json];
   (
-    node["shop"](around:1500,${userLat},${userLng});
-    node["amenity"="supermarket"](around:1500,${userLat},${userLng});
+    node["shop"](around:5000,${userLat},${userLng});
+    node["amenity"="supermarket"](around:5000,${userLat},${userLng});
+    node["name"~"Lidl|Biedronka|Livio|Dino|Aldi", i](around:5000,${userLat},${userLng});
   );
-  out;
+  out center;
   `;
 
   const res = await fetch("https://overpass-api.de/api/interpreter", {
@@ -170,6 +184,11 @@ function renderShops(shops) {
   const box = document.getElementById("shops");
   box.innerHTML = "";
 
+  if (!shops.length) {
+    box.innerHTML = "Brak sklepów w pobliżu";
+    return;
+  }
+
   shops.forEach(s => {
     box.innerHTML += `
       <div class="card">
@@ -180,10 +199,6 @@ function renderShops(shops) {
     `;
   });
 }
-
-
-// START
-loadProducts();
 </script>
 
 </body>
