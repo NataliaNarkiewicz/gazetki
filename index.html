@@ -2,203 +2,146 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Gazetka + sklepy w pobliżu</title>
+<title>Arrows</title>
 
 <style>
+/* ===== CAŁA STRONA ===== */
 body {
   margin: 0;
   font-family: Arial;
-  background: #0f172a;
-  color: white;
+
+  /* jasne tło */
+  background: #f2f2f2;
+
+  text-align: center;
 }
 
-header {
-  padding: 15px;
-  background: #111827;
-  position: sticky;
-  top: 0;
+/* ===== POLE GRY NA CAŁY EKRAN ===== */
+#game {
+  width: 100vw;   /* pełna szerokość ekranu */
+  height: 80vh;   /* prawie cały ekran */
+
+  position: relative;
+  overflow: hidden;
+
+  border-top: 2px solid #aaa;
+  border-bottom: 2px solid #aaa;
 }
 
-.controls {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+/* ===== STRZAŁKI ===== */
+.arrow {
+  position: absolute;
+  font-size: 40px;
+
+  color: black; /* ciemne strzałki na jasnym tle */
+  top: 0px;
 }
 
-input, button {
-  padding: 10px;
-  border-radius: 8px;
-  border: none;
-}
-
-button {
-  background: #2563eb;
-  color: white;
-  cursor: pointer;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 15px;
-  padding: 15px;
-}
-
-.card {
-  background: #1f2937;
-  padding: 12px;
-  border-radius: 10px;
-}
-
-.section {
-  padding: 10px 15px;
-  font-weight: bold;
-  color: #38bdf8;
+/* ===== WYNIK ===== */
+#score {
+  font-size: 22px;
 }
 </style>
 </head>
 
 <body>
 
-<header>
-  <h2>🛒 Gazetka + Sklepy w pobliżu</h2>
+<h1>Arrows</h1>
 
-  <div class="controls">
-    <input type="text" placeholder="Szukaj produktów..." oninput="search(this.value)">
-    <button onclick="sortPrice()">⬆ Cena</button>
-    <button onclick="loadShops()">📍 Sklepy</button>
-  </div>
-</header>
+<div id="game"></div>
 
-<div class="section">PRODUKTY</div>
-<div id="products" class="grid"></div>
-
-<div class="section">SKLEPY W POBLIŻU</div>
-<div id="shops" class="grid"></div>
+<p id="score">Score: 0</p>
 
 <script>
-const SUPABASE_URL = "https://xtucjfzxwfxnlowjwxgk.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0dWNqZnp4d2Z4bmxvd2p3eGdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4MDg0NzIsImV4cCI6MjA5MTM4NDQ3Mn0.CpIjKKhbXrNAnEefZYU-4T1jUWI7whpygeiXZggNvQs";
 
-let produkty = [];
-let userLat = null;
-let userLng = null;
+// ===== ELEMENTY =====
+const game = document.getElementById("game");
+const scoreText = document.getElementById("score");
 
+// ===== ZMIENNE =====
+let score = 0;
+let arrows = [];
 
-// ================= GPS (POPRAWIONE) =================
+// klawisze
+const keys = ["ArrowLeft", "ArrowUp", "ArrowDown", "ArrowRight"];
+const symbols = ["←", "↑", "↓", "→"];
 
-navigator.geolocation.getCurrentPosition(
-  pos => {
-    userLat = pos.coords.latitude;
-    userLng = pos.coords.longitude;
+// ===== MAPA =====
+const chart = [
+  { time: 1000, lane: 0 },
+  { time: 1500, lane: 1 },
+  { time: 2000, lane: 2 },
+  { time: 2500, lane: 3 },
+  { time: 3000, lane: 1 },
+];
 
-    loadProducts();
-    loadShops();
-  },
-  err => {
-    alert("Brak lokalizacji — włącz GPS");
-    loadProducts();
-  }
-);
+let startTime = Date.now();
 
+// ===== STRZAŁKA =====
+function spawnArrow(lane) {
 
-// ================= SUPABASE =================
+  const arrow = document.createElement("div");
+  arrow.className = "arrow";
+  arrow.innerText = symbols[lane];
 
-async function loadProducts() {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/produkty?select=*`, {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: "Bearer " + SUPABASE_KEY
+  // szerokość ekranu → dzielimy na 4 części
+  arrow.style.left = (lane * window.innerWidth / 4 + window.innerWidth / 8) + "px";
+
+  arrow.style.top = "0px";
+
+  game.appendChild(arrow);
+
+  arrows.push({
+    element: arrow,
+    y: 0,
+    lane: lane
+  });
+}
+
+// ===== SPAWN Z CZASU =====
+function spawnFromChart() {
+  let time = Date.now() - startTime;
+
+  chart.forEach(note => {
+    if (!note.spawned && time >= note.time) {
+      spawnArrow(note.lane);
+      note.spawned = true;
     }
   });
-
-  produkty = await res.json();
-  renderProducts(produkty);
 }
 
-function renderProducts(data) {
-  const box = document.getElementById("products");
-  box.innerHTML = "";
-
-  data.forEach(p => {
-    box.innerHTML += `
-      <div class="card">
-        <b>${p.nazwa}</b><br>
-        💰 ${p.cena} zł<br>
-        🏪 ${p.sklep}<br>
-        ${p.promocja || ""}
-      </div>
-    `;
+// ===== RUCH =====
+function update() {
+  arrows.forEach(a => {
+    a.y += 3;
+    a.element.style.top = a.y + "px";
   });
 }
 
+// ===== TRAFIENIE =====
+function checkHit(key) {
+  const lane = keys.indexOf(key);
 
-// ================= SEARCH =================
+  arrows.forEach((a, i) => {
+    if (a.lane === lane && a.y > window.innerHeight * 0.6) {
+      score += 10;
+      scoreText.innerText = "Score: " + score;
 
-function search(text) {
-  renderProducts(
-    produkty.filter(p =>
-      p.nazwa.toLowerCase().includes(text.toLowerCase())
-    )
-  );
-}
-
-
-// ================= SORT =================
-
-function sortPrice() {
-  produkty.sort((a,b) => a.cena - b.cena);
-  renderProducts(produkty);
-}
-
-
-// ================= OPENSTREETMAP =================
-
-async function loadShops() {
-  if (!userLat) {
-    alert("Brak GPS");
-    return;
-  }
-
-  const query = `
-  [out:json];
-  (
-    node["shop"](around:5000,${userLat},${userLng});
-    node["amenity"="supermarket"](around:5000,${userLat},${userLng});
-    node["name"~"Lidl|Biedronka|Livio|Dino|Aldi", i](around:5000,${userLat},${userLng});
-  );
-  out center;
-  `;
-
-  const res = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    body: query
-  });
-
-  const data = await res.json();
-
-  renderShops(data.elements);
-}
-
-function renderShops(shops) {
-  const box = document.getElementById("shops");
-  box.innerHTML = "";
-
-  if (!shops.length) {
-    box.innerHTML = "Brak sklepów w pobliżu";
-    return;
-  }
-
-  shops.forEach(s => {
-    box.innerHTML += `
-      <div class="card">
-        🏪 ${s.tags?.name || "Sklep"}<br>
-        📍 ${Number(s.lat).toFixed(4)}, ${Number(s.lon).toFixed(4)}<br>
-        🛒 ${s.tags?.shop || s.tags?.amenity || ""}
-      </div>
-    `;
+      game.removeChild(a.element);
+      arrows.splice(i, 1);
+    }
   });
 }
+
+// ===== KLAWIATURA =====
+document.addEventListener("keydown", e => {
+  checkHit(e.key);
+});
+
+// ===== LOOP =====
+setInterval(update, 16);
+setInterval(spawnFromChart, 16);
+
 </script>
 
 </body>
